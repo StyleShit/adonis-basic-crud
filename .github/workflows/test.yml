@@ -1,0 +1,34 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: latest
+      - name: Cache node modules
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.cache-name }}-
+            ${{ runner.os }}-
+            ${{ runner.os }}-
+      - name: Install Dependencies
+        run: npm ci
+      - name: Create ENV file
+        run: cp .env.example .env
+      - name: Create a ./tmp directory for the database file
+        run: mkdir ./tmp
+      - name: Run Japa
+        run: node ace test
