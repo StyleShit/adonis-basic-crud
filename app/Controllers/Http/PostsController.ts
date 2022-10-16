@@ -7,10 +7,12 @@ export default class PostsController {
     return await Post.all()
   }
 
-  public async store ({ request }: HttpContextContract) {
+  public async store ({ request, response }: HttpContextContract) {
     const payload = await request.validate(CreatePostValidator)
 
-    return Post.create(payload)
+    const post = await Post.create(payload)
+
+    response.created(post)
   }
 
   public async show ({ request, response }: HttpContextContract) {
