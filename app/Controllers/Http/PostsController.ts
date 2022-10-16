@@ -1,6 +1,7 @@
 import type { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
 import Post from 'App/Models/Post'
 import CreatePostValidator from 'App/Validators/CreatePostValidator'
+import UpdatePostValidator from 'App/Validators/UpdatePostValidator'
 
 export default class PostsController {
   public async index () {
@@ -32,7 +33,7 @@ export default class PostsController {
   }
 
   public async update ({ request, response }: HttpContextContract) {
-    const payload = await request.validate(CreatePostValidator)
+    const payload = await request.validate(UpdatePostValidator)
 
     const postId = request.param('id')
 
