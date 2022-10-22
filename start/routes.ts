@@ -21,5 +21,11 @@
 import Route from '@ioc:Adonis/Core/Route'
 
 Route.group(() => {
-  Route.resource('/posts', 'PostsController').apiOnly()
+  Route.resource('/posts', 'PostsController')
+    .apiOnly()
+    .middleware({
+      store: 'auth:api',
+      update: 'auth:api',
+      destroy: 'auth:api',
+    })
 }).prefix('api/v1')

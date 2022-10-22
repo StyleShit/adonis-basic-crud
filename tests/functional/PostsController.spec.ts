@@ -1,8 +1,9 @@
 import Database from '@ioc:Adonis/Lucid/Database'
 import { test } from '@japa/runner'
 import Post from 'App/Models/Post'
-import { PostFactory } from 'Database/factories'
+import { PostFactory, UserFactory } from 'Database/factories'
 import { faker } from '@faker-js/faker'
+import AuthManager from '@ioc:Adonis/Addons/Auth'
 
 test.group('PostsController', (group) => {
   // Clean database between tests.
@@ -12,6 +13,35 @@ test.group('PostsController', (group) => {
     return () => Database.rollbackGlobalTransaction()
   })
 
+  test('Should require authentication -- {name}')
+    .with([
+      {
+        name: 'Create post',
+        method: 'post',
+        url: '/',
+      },
+      {
+        name: 'Edit post',
+        method: 'patch',
+        url: '/1',
+      },
+      {
+        name: 'Delete post',
+        method: 'delete',
+        url: '/1',
+      },
+    ])
+    .run(async ({ client }, { method, url }) => {
+      // Act.
+      const response = await client[method](`/api/v1/posts${ url }`)
+
+      // Assert.
+      response.assertStatus(401)
+    })
+
+  /**
+   * GET /posts
+   */
   test('Should show all posts', async ({ client }) => {
     // Arrange.
     await PostFactory.createMany(5)
@@ -26,11 +56,19 @@ test.group('PostsController', (group) => {
     response.assertBody(expectedBody)
   })
 
+  /**
+   * POST /posts
+   */
   test('Should fail to create post with invalid post data -- {name}')
     .with(postCreationDataProvider)
     .run(async ({ client }, { postData, errors }) => {
+      // Arrange.
+      const { headers } = await auth()
+
       // Act.
-      const response = await client.post('/api/v1/posts').json(postData)
+      const response = await client.post('/api/v1/posts')
+        .headers(headers)
+        .json(postData)
 
       // Assert.
       response.assertStatus(422)
@@ -44,8 +82,12 @@ test.group('PostsController', (group) => {
       content: 'test-content',
     }
 
+    const { headers } = await auth()
+
     // Act.
-    const response = await client.post('/api/v1/posts').json(postData)
+    const response = await client.post('/api/v1/posts')
+      .headers(headers)
+      .json(postData)
 
     // Assert.
     const createdPost = await Post.find(response.body().id)
@@ -57,6 +99,9 @@ test.group('PostsController', (group) => {
     })
   })
 
+  /**
+   * GET /posts/:id
+   */
   test('Should throw 404 for non-existing post when trying to view it', async ({ client }) => {
     // Act.
     const response = await client.get('/api/v1/posts/non-existing-id')
@@ -85,14 +130,21 @@ test.group('PostsController', (group) => {
     })
   })
 
+  /**
+   * PATCH /posts/:id
+   */
   test('Should fail to update post with invalid post data -- {name}')
     .with(postUpdateDataProvider)
     .run(async ({ client }, { postData, errors }) => {
       // Arrange.
       const post = await PostFactory.create()
 
+      const { headers } = await auth()
+
       // Act.
-      const response = await client.patch(`/api/v1/posts/${ post.id }`).json(postData)
+      const response = await client.patch(`/api/v1/posts/${ post.id }`)
+        .headers(headers)
+        .json(postData)
 
       // Assert.
       response.assertStatus(422)
@@ -105,8 +157,12 @@ test.group('PostsController', (group) => {
       title: 'new-title',
     }
 
+    const { headers } = await auth()
+
     // Act.
-    const response = await client.patch('/api/v1/posts/non-existing-id').json(postData)
+    const response = await client.patch('/api/v1/posts/non-existing-id')
+      .headers(headers)
+      .json(postData)
 
     // Assert.
     response.assertStatus(404)
@@ -126,8 +182,12 @@ test.group('PostsController', (group) => {
       content: 'new-content',
     }
 
+    const { headers } = await auth()
+
     // Act.
-    const response = await client.patch(`/api/v1/posts/${ post.id }`).json(postData)
+    const response = await client.patch(`/api/v1/posts/${ post.id }`)
+      .headers(headers)
+      .json(postData)
 
     // Assert.
     const updatedPost = await Post.find(post.id)
@@ -142,9 +202,15 @@ test.group('PostsController', (group) => {
     assert.equal('new-content', updatedPost?.content)
   })
 
+  /**
+   * DELETE /posts/:id
+   */
   test('Should throw 404 for non-existing post when trying to delete it', async ({ client }) => {
+    // Arrange.
+    const { headers } = await auth()
+
     // Act.
-    const response = await client.delete('/api/v1/posts/non-existing-id')
+    const response = await client.delete('/api/v1/posts/non-existing-id').headers(headers)
 
     // Assert.
     response.assertStatus(404)
@@ -158,9 +224,10 @@ test.group('PostsController', (group) => {
   test('Should delete a post', async ({ client, assert }) => {
     // Arrange.
     const post = await PostFactory.create()
+    const { headers } = await auth()
 
     // Act.
-    const response = await client.delete(`/api/v1/posts/${ post.id }`)
+    const response = await client.delete(`/api/v1/posts/${ post.id }`).headers(headers)
 
     // Assert.
     const deletedPost = await Post.find(post.id)
@@ -276,4 +343,18 @@ function postUpdateDataProvider () {
       ],
     },
   ]
+}
+
+async function auth () {
+  const {
+    cookies = {},
+    headers = {},
+    session = {},
+  } = await AuthManager.client('api').login(await UserFactory.create())
+
+  return {
+    cookies,
+    headers,
+    session,
+  }
 }
